@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraCare ER — Hospital Emergency Management System</title>
+    
+    <!-- Modern Typography: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Custom Refreshing Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="light-theme">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand-section">
+                <div class="brand-icon-wrapper pulse-soft">
+                    <i class="fa-solid fa-hospital-symbol"></i>
+                </div>
+                <div>
+                    <div class="brand-title">
+                        <span class="brand-gradient">AuraCare</span> Emergency ER
+                    </div>
+                    <div class="brand-subtitle">
+                        <span class="live-indicator"><span class="dot"></span> REAL-TIME TRIAGE QUEUE</span>
+                        <span class="pill-badge pill-ds">Linked List Record Store</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Actions -->
+            <div class="header-actions">
+                <button class="btn btn-emerald" onclick="openRegistrationModal()">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>Register Patient</span>
+                </button>
+                <button class="btn btn-primary" onclick="callNextPatient()">
+                    <i class="fa-solid fa-bell-concierge"></i>
+                    <span>Call Next (Priority Queue)</span>
+                </button>
+                <div class="header-btn-group">
+                    <a href="/download-zip" class="btn btn-outline-cyan" title="Download entire project as ZIP file">
+                        <i class="fa-solid fa-file-zipper"></i>
+                        <span>Download ZIP</span>
+                    </a>
+                    <button class="btn btn-outline-cyan" onclick="seedDemoData()" title="Re-seed with sample emergency cases">
+                        <i class="fa-solid fa-flask-vial"></i>
+                        <span>Sample Cases</span>
+                    </button>
+                    <button class="btn btn-outline-rose" onclick="resetAllData()" title="Clear all records">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="app-nav">
+            <div class="nav-container">
+                <button class="nav-tab active" data-tab="tab-queue" onclick="switchTab('tab-queue')">
+                    <i class="fa-solid fa-list-ol"></i>
+                    <span>Live Emergency Queue</span>
+                    <span class="tab-badge badge-queue-count" id="nav-queue-count">0</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-bays" onclick="switchTab('tab-bays')">
+                    <i class="fa-solid fa-bed-pulse"></i>
+                    <span>Treatment Bays & Beds</span>
+                    <span class="tab-badge badge-bays-count" id="nav-bays-occupied">0/6</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-records" onclick="switchTab('tab-records')">
+                    <i class="fa-solid fa-clipboard-user"></i>
+                    <span>Patient Records Registry</span>
+                    <span class="tab-badge badge-total-records" id="nav-records-count">0</span>
+                </button>
+                <button class="nav-tab" data-tab="tab-linked-list" onclick="switchTab('tab-linked-list')">
+                    <i class="fa-solid fa-diagram-project"></i>
+                    <span>Linked List Visualizer</span>
+                    <span class="tab-badge badge-ds-label">O(1) Dynamic</span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="app-main">
+
+        <!-- Refreshing Multi-Color KPI Stat Cards -->
+        <section class="kpi-grid">
+            <!-- Card 1: Critical Emergency (Crimson) -->
+            <div class="kpi-card card-crimson">
+                <div class="kpi-icon"><i class="fa-solid fa-heart-pulse"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-title">Critical Emergency (P1)</div>
+                    <div class="kpi-value" id="kpi-p1-count">0</div>
+                    <div class="kpi-subtext">Immediate Resuscitation Required</div>
+                </div>
+                <div class="kpi-glow-accent"></div>
+            </div>
+
+            <!-- Card 2: Queue Waiting (Teal/Ocean) -->
+            <div class="kpi-card card-teal">
+                <div class="kpi-icon"><i class="fa-solid fa-users-line"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-title">Waiting in Priority Queue</div>
+                    <div class="kpi-value" id="kpi-waiting-count">0</div>
+                    <div class="kpi-subtext">Triage Order (P1 > P2 > P3 > P4 FIFO)</div>
+                </div>
+                <div class="kpi-glow-accent"></div>
+            </div>
+
+            <!-- Card 3: In Active Treatment (Electric Indigo) -->
+            <div class="kpi-card card-indigo">
+                <div class="kpi-icon"><i class="fa-solid fa-stethoscope"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-title">In Treatment Bays</div>
+                    <div class="kpi-value" id="kpi-treatment-count">0</div>
+                    <div class="kpi-subtext"><span id="kpi-available-bays">0</span> ER Bays Available</div>
+                </div>
+                <div class="kpi-glow-accent"></div>
+            </div>
+
+            <!-- Card 4: Normal Cases (Refreshing Emerald) -->
+            <div class="kpi-card card-emerald">
+                <div class="kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-title">Standard Cases (P4)</div>
+                    <div class="kpi-value" id="kpi-p4-count">0</div>
+                    <div class="kpi-subtext">Strict FIFO Execution Order</div>
+                </div>
+                <div class="kpi-glow-accent"></div>
+            </div>
+
+            <!-- Card 5: Dynamic Linked List Registry (Warm Amber/Sunset) -->
+            <div class="kpi-card card-amber">
+                <div class="kpi-icon"><i class="fa-solid fa-network-wired"></i></div>
+                <div class="kpi-content">
+                    <div class="kpi-title">Dynamic Linked List Store</div>
+                    <div class="kpi-value" id="kpi-linked-list-nodes">0</div>
+                    <div class="kpi-subtext">Total Nodes Maintained Dynamically</div>
+                </div>
+                <div class="kpi-glow-accent"></div>
+            </div>
+        </section>
+
+        <!-- Triage Priority Legend Ribbon -->
+        <section class="triage-legend-strip">
+            <div class="legend-header">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>Triage Protocol:</span>
+            </div>
+            <div class="legend-items">
+                <div class="legend-item badge-p1">
+                    <span class="legend-dot dot-p1"></span>
+                    <strong>Priority 1: Immediate / Resuscitation</strong>
+                    <span class="legend-time">(0 min — skips to front)</span>
+                </div>
+                <div class="legend-item badge-p2">
+                    <span class="legend-dot dot-p2"></span>
+                    <strong>Priority 2: Emergency / High</strong>
+                    <span class="legend-time">(&lt; 15 mins)</span>
+                </div>
+                <div class="legend-item badge-p3">
+                    <span class="legend-dot dot-p3"></span>
+                    <strong>Priority 3: Urgent / Moderate</strong>
+                    <span class="legend-time">(&lt; 60 mins)</span>
+                </div>
+                <div class="legend-item badge-p4">
+                    <span class="legend-dot dot-p4"></span>
+                    <strong>Priority 4: Normal Cases</strong>
+                    <span class="legend-time">(Strict FIFO Arrival Order)</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 1: Live Emergency Queue -->
+        <div id="tab-queue" class="tab-pane active">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <h2 class="pane-title">
+                        <i class="fa-solid fa-arrow-down-short-wide text-cyan"></i>
+                        Priority Dispatch Queue
+                    </h2>
+                    <p class="pane-desc">
+                        Patients are dequeued according to clinical urgency: 
+                        <strong>P1 Emergency cases take precedence immediately</strong>, 
+                        while normal cases wait in strict <strong>First-In, First-Out (FIFO)</strong> order.
+                    </p>
+                </div>
+                <div class="pane-actions">
+                    <button class="btn btn-outline-cyan btn-sm" onclick="fetchLiveState()">
+                        <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="callNextPatient()">
+                        <i class="fa-solid fa-user-check"></i> Call Next (#1 In Line)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Queue Patients Grid / List -->
+            <div id="queue-container" class="queue-grid">
+                <!-- Dynamically populated queue patient cards -->
+                <div class="empty-state">
+                    <i class="fa-solid fa-user-slash"></i>
+                    <h3>No Patients Currently in Queue</h3>
+                    <p>All registered patients have been attended or no arrivals recorded.</p>
+                    <button class="btn btn-emerald" onclick="openRegistrationModal()">
+                        <i class="fa-solid fa-user-plus"></i> Register New Patient
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Treatment Bays & ER Beds -->
+        <div id="tab-bays" class="tab-pane">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <h2 class="pane-title">
+                        <i class="fa-solid fa-bed-pulse text-indigo"></i>
+                        Emergency Treatment Bays & Clinical Beds
+                    </h2>
+                    <p class="pane-desc">
+                        Patients admitted from the priority queue undergo medical intervention here. 
+                        Completing treatment discharges the patient and records clinical outcomes in their permanent linked list file.
+                    </p>
+                </div>
+                <div class="pane-actions">
+                    <button class="btn btn-primary btn-sm" onclick="callNextPatient()">
+                        <i class="fa-solid fa-plus"></i> Admit Next From Queue
+                    </button>
+                </div>
+            </div>
+
+            <!-- ER Bays Grid -->
+            <div id="bays-container" class="bays-grid">
+                <!-- Dynamically populated bay cards -->
+            </div>
+        </div>
+
+        <!-- TAB 3: Patient Records Registry (Linked List Store) -->
+        <div id="tab-records" class="tab-pane">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <h2 class="pane-title">
+                        <i class="fa-solid fa-folder-tree text-emerald"></i>
+                        Patient Records Maintenance (Dynamic Linked List)
+                    </h2>
+                    <p class="pane-desc">
+                        Every patient file is dynamically allocated in memory inside a Doubly Linked List, 
+                        enabling efficient addition, status updates, clinical history retention, and searches.
+                    </p>
+                </div>
+                <div class="pane-actions">
+                    <button class="btn btn-emerald btn-sm" onclick="openRegistrationModal()">
+                        <i class="fa-solid fa-user-plus"></i> New Patient File
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter and Search Bar -->
+            <div class="search-filter-bar">
+                <div class="search-input-wrapper">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="record-search-input" placeholder="Search by patient ID, name, or symptoms..." oninput="filterRecords()">
+                </div>
+                <div class="filter-controls">
+                    <div class="select-wrapper">
+                        <label><i class="fa-solid fa-filter"></i> Priority:</label>
+                        <select id="filter-priority" onchange="filterRecords()">
+                            <option value="all">All Priorities</option>
+                            <option value="1">Priority 1 - Critical</option>
+                            <option value="2">Priority 2 - Emergency</option>
+                            <option value="3">Priority 3 - Urgent</option>
+                            <option value="4">Priority 4 - Normal</option>
+                        </select>
+                    </div>
+                    <div class="select-wrapper">
+                        <label><i class="fa-solid fa-tag"></i> Status:</label>
+                        <select id="filter-status" onchange="filterRecords()">
+                            <option value="all">All Statuses</option>
+                            <option value="waiting">Waiting in Queue</option>
+                            <option value="under_treatment">Under Treatment</option>
+                            <option value="completed">Completed / Discharged</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patient Records Table -->
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Patient ID</th>
+                                <th>Name & Demographics</th>
+                                <th>Chief Complaint</th>
+                                <th>Triage Priority</th>
+                                <th>Vitals</th>
+                                <th>Status</th>
+                                <th>Arrival / Wait</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="records-table-body">
+                            <!-- Dynamically generated rows -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <span id="records-count-text">Showing 0 records</span>
+                    <div class="footer-pills">
+                        <span class="pill-badge pill-cyan"><i class="fa-solid fa-database"></i> Dynamic Linked Nodes</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Linked List Visualizer -->
+        <div id="tab-linked-list" class="tab-pane">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <h2 class="pane-title">
+                        <i class="fa-solid fa-diagram-project text-cyan"></i>
+                        Dynamic Doubly Linked List Structure Visualizer
+                    </h2>
+                    <p class="pane-desc">
+                        Live real-time inspection of node memory pointers: <code>prev &lt;=&gt; next</code>. 
+                        Notice how newly registered patients dynamically attach to the tail, and records are maintained in dynamic memory.
+                    </p>
+                </div>
+                <div class="pane-actions">
+                    <button class="btn btn-outline-cyan btn-sm" onclick="fetchLinkedListGraph()">
+                        <i class="fa-solid fa-rotate"></i> Redraw Graph
+                    </button>
+                </div>
+            </div>
+
+            <div class="ds-visualizer-container">
+                <div class="ds-meta-strip">
+                    <div class="ds-meta-item">
+                        <span class="ds-label">HEAD POINTER:</span>
+                        <code class="ds-code" id="ds-head-id">None</code>
+                    </div>
+                    <div class="ds-meta-item">
+                        <span class="ds-label">TAIL POINTER:</span>
+                        <code class="ds-code" id="ds-tail-id">None</code>
+                    </div>
+                    <div class="ds-meta-item">
+                        <span class="ds-label">TOTAL ALLOCATED NODES:</span>
+                        <span class="ds-count" id="ds-node-count">0</span>
+                    </div>
+                </div>
+
+                <div class="graph-scroll-box" id="linked-list-graph-nodes">
+                    <!-- Dynamically rendered linked list nodes -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: Patient Registration & Smart Triage -->
+    <div class="modal-backdrop" id="modal-registration">
+        <div class="modal-box modal-lg">
+            <div class="modal-header header-emerald">
+                <div class="modal-title">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>Register New Patient & Clinical Triage</span>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-registration')">&times;</button>
+            </div>
+            <form id="patient-registration-form" onsubmit="handleRegistrationSubmit(event)">
+                <div class="modal-body">
+
+                    <!-- Personal Information -->
+                    <div class="form-section-title">
+                        <i class="fa-solid fa-id-card"></i> Patient Demographics
+                    </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>Full Name <span class="req">*</span></label>
+                            <input type="text" id="reg-name" required placeholder="e.g. Rachel Adams">
+                        </div>
+                        <div class="form-group">
+                            <label>Age <span class="req">*</span></label>
+                            <input type="number" id="reg-age" required min="1" max="120" placeholder="e.g. 45">
+                        </div>
+                        <div class="form-group">
+                            <label>Gender <span class="req">*</span></label>
+                            <select id="reg-gender">
+                                <option value="Female">Female</option>
+                                <option value="Male">Male</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label>Contact Phone</label>
+                            <input type="tel" id="reg-contact" placeholder="+1-555-0199">
+                        </div>
+                        <div class="form-group">
+                            <label>Blood Group</label>
+                            <select id="reg-blood">
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                                <option value="Unknown">Unknown</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Clinical Presentation & Smart Triage -->
+                    <div class="form-section-title">
+                        <i class="fa-solid fa-stethoscope"></i> Clinical Complaint & Smart Triage Helper
+                    </div>
+                    <div class="form-group">
+                        <label>Chief Complaint / Symptoms <span class="req">*</span></label>
+                        <textarea id="reg-complaint" rows="2" required placeholder="Describe primary symptoms (e.g. severe chest pain, high fever, laceration...)" oninput="smartTriageSuggest()"></textarea>
+                    </div>
+
+                    <!-- Vitals Entry -->
+                    <div class="form-row-4">
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-heart-pulse text-rose"></i> Heart Rate (bpm)</label>
+                            <input type="number" id="reg-hr" value="78" min="30" max="250" oninput="smartTriageSuggest()">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-gauge-high text-violet"></i> Blood Pressure</label>
+                            <input type="text" id="reg-bp" value="120/80" placeholder="120/80">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-lungs text-cyan"></i> SpO2 Oxygen (%)</label>
+                            <input type="number" id="reg-spo2" value="98" min="50" max="100" oninput="smartTriageSuggest()">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-temperature-half text-amber"></i> Temp (°F)</label>
+                            <input type="number" step="0.1" id="reg-temp" value="98.6" min="90" max="110">
+                        </div>
+                    </div>
+
+                    <!-- Smart Triage Recommendation Banner -->
+                    <div id="smart-triage-suggestion" class="triage-suggestion-box">
+                        <div class="suggestion-icon"><i class="fa-solid fa-brain"></i></div>
+                        <div class="suggestion-text">
+                            <strong>AI Smart Triage Assistant:</strong>
+                            <span id="suggestion-explanation">Normal vitals and symptoms detected. Suggested: Priority 4 (Normal FIFO).</span>
+                        </div>
+                    </div>
+
+                    <!-- Priority Level Selection with Refreshing Colors -->
+                    <div class="form-group">
+                        <label>Assigned Triage Priority <span class="req">*</span></label>
+                        <div class="priority-radio-grid">
+                            <label class="priority-option opt-p1">
+                                <input type="radio" name="priority_selection" value="1" id="rad-p1">
+                                <div class="priority-pill-content">
+                                    <div class="p-header"><span class="dot-p1"></span> Priority 1</div>
+                                    <div class="p-title">Immediate / Critical</div>
+                                    <div class="p-desc">Life-threatening, cardiac arrest, respiratory failure. Served FIRST.</div>
+                                </div>
+                            </label>
+
+                            <label class="priority-option opt-p2">
+                                <input type="radio" name="priority_selection" value="2" id="rad-p2">
+                                <div class="priority-pill-content">
+                                    <div class="p-header"><span class="dot-p2"></span> Priority 2</div>
+                                    <div class="p-title">Emergency / Urgent</div>
+                                    <div class="p-desc">Severe asthma, open fracture, severe trauma. &lt; 15 mins.</div>
+                                </div>
+                            </label>
+
+                            <label class="priority-option opt-p3">
+                                <input type="radio" name="priority_selection" value="3" id="rad-p3">
+                                <div class="priority-pill-content">
+                                    <div class="p-header"><span class="dot-p3"></span> Priority 3</div>
+                                    <div class="p-title">Urgent / Moderate</div>
+                                    <div class="p-desc">Deep lacerations, moderate abdominal pain, severe sprain.</div>
+                                </div>
+                            </label>
+
+                            <label class="priority-option opt-p4">
+                                <input type="radio" name="priority_selection" value="4" id="rad-p4" checked>
+                                <div class="priority-pill-content">
+                                    <div class="p-header"><span class="dot-p4"></span> Priority 4</div>
+                                    <div class="p-title">Standard / Normal</div>
+                                    <div class="p-desc">Mild symptoms, rash, routine ER visits. Follows strict FIFO order.</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Clinical Notes & Known Allergies</label>
+                        <input type="text" id="reg-notes" placeholder="e.g. Allergic to Sulfa drugs; accompanied by spouse">
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-registration')">Cancel</button>
+                    <button type="submit" class="btn btn-emerald">
+                        <i class="fa-solid fa-check"></i> Register & Enqueue Patient
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Treatment Completion & Clinical Notes -->
+    <div class="modal-backdrop" id="modal-treatment">
+        <div class="modal-box">
+            <div class="modal-header header-indigo">
+                <div class="modal-title">
+                    <i class="fa-solid fa-notes-medical"></i>
+                    <span>Complete Treatment & Medical Disposition</span>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-treatment')">&times;</button>
+            </div>
+            <form id="treatment-completion-form" onsubmit="handleTreatmentCompletion(event)">
+                <input type="hidden" id="treat-patient-id">
+                <div class="modal-body">
+                    <div class="patient-banner-mini" id="treat-patient-summary">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="form-group">
+                        <label>Primary Clinical Diagnosis <span class="req">*</span></label>
+                        <input type="text" id="treat-diagnosis" required placeholder="e.g. Acute coronary syndrome, Acute bronchitis, Ankle sprain">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Medications Administered / Prescribed</label>
+                        <input type="text" id="treat-medications" placeholder="e.g. Aspirin 325mg, IV Normal Saline, Ondansetron 4mg">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Medical Disposition / Outcome <span class="req">*</span></label>
+                        <select id="treat-outcome">
+                            <option value="Discharged Home">Discharged Home (Stable)</option>
+                            <option value="Admitted to General Ward">Admitted to General Ward</option>
+                            <option value="Transferred to Intensive Care (ICU)">Transferred to Intensive Care (ICU)</option>
+                            <option value="Referred to Specialty Surgery">Referred to Specialty Surgery</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Attending Physician Discharge Notes</label>
+                        <textarea id="treat-notes" rows="3" placeholder="Condition resolved, vitals stable at discharge. Advised follow-up in 48 hours."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-treatment')">Cancel</button>
+                    <button type="submit" class="btn btn-indigo">
+                        <i class="fa-solid fa-circle-check"></i> Finalize Treatment & Discharge
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Re-Triage Priority Escalation -->
+    <div class="modal-backdrop" id="modal-retriage">
+        <div class="modal-box modal-sm">
+            <div class="modal-header header-amber">
+                <div class="modal-title">
+                    <i class="fa-solid fa-arrows-up-down"></i>
+                    <span>Re-Triage Patient Urgency</span>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-retriage')">&times;</button>
+            </div>
+            <form id="retriage-form" onsubmit="handleRetriageSubmit(event)">
+                <input type="hidden" id="retriage-patient-id">
+                <div class="modal-body">
+                    <p class="text-muted" id="retriage-patient-name"></p>
+                    <div class="form-group">
+                        <label>Select New Priority Level <span class="req">*</span></label>
+                        <select id="retriage-new-priority" class="form-select">
+                            <option value="1">Priority 1 - Immediate / Resuscitation (Code Red)</option>
+                            <option value="2">Priority 2 - Emergency / Very Urgent (Orange)</option>
+                            <option value="3">Priority 3 - Urgent / Moderate (Yellow)</option>
+                            <option value="4">Priority 4 - Standard / Normal (Green FIFO)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Reason for Triage Change</label>
+                        <input type="text" id="retriage-reason" placeholder="e.g. Vitals dropped, acute shortness of breath observed">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-retriage')">Cancel</button>
+                    <button type="submit" class="btn btn-amber">Update Priority & Queue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Full Patient Medical Chart & Print Slip -->
+    <div class="modal-backdrop" id="modal-patient-chart">
+        <div class="modal-box modal-lg">
+            <div class="modal-header header-cyan">
+                <div class="modal-title">
+                    <i class="fa-solid fa-file-waveform"></i>
+                    <span>Emergency Medical Record</span>
+                </div>
+                <button class="btn-close" onclick="closeModal('modal-patient-chart')">&times;</button>
+            </div>
+            <div class="modal-body" id="patient-chart-content">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-cyan" onclick="printPatientChart()">
+                    <i class="fa-solid fa-print"></i> Print Slip
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-patient-chart')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Application Script -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
